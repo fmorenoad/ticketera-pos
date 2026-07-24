@@ -1,0 +1,43 @@
+INSTALACION DEL PUNTO DE IMPRESION - TICKETERA
+===============================================
+
+Requisitos: PC con Windows 10/11, impresora termica conectada por USB,
+y Google Chrome instalado.
+
+1. Instalar Python (solo la primera vez)
+   - Descargar desde https://www.python.org/downloads/
+   - IMPORTANTE: marcar la casilla "Add Python to PATH" al instalar.
+
+2. Copiar esta carpeta completa a C:\ticketera-pos
+
+3. Ejecutar instalar_dependencias.bat (doble clic)
+   Instala las librerias necesarias. Solo la primera vez.
+
+4. Indicar la impresora termica
+   - Crear un archivo de texto llamado: impresora.txt (en esta carpeta)
+   - Escribir dentro SOLO el nombre exacto de la impresora tal como
+     aparece en Windows (Configuracion > Impresoras). Ejemplo:
+
+     XP-80C
+
+   - Si no se crea el archivo, se usara la impresora predeterminada
+     de Windows.
+
+5. Operar
+   - abrir_kiosko.bat: levanta el servicio de impresion y abre la
+     ticketera en Chrome a pantalla completa (uso normal de la caja).
+   - iniciar_impresion.bat: levanta solo el servicio de impresion.
+
+Verificacion rapida: con el servicio corriendo, abrir en el navegador
+http://127.0.0.1:5000/status : debe indicar la impresora y
+"impresora_disponible": true. Las plantillas de ticket se sincronizan
+solas desde el servidor al iniciar.
+
+Problemas frecuentes
+--------------------
+- La cola de impresion queda "Error" con la impresora conectada:
+  el driver USB pudo quedar tomado por una utilidad del fabricante
+  (WinUSB). Solucion: en el Administrador de dispositivos, actualizar
+  el driver del dispositivo de la impresora a "Compatibilidad de
+  impresion USB", o pedir soporte a iwan Solutions.
+- El ticket sale por otra impresora: revisar impresora.txt.
