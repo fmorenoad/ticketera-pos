@@ -14,6 +14,10 @@ import time
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Habilitar CORS para todas las rutas
 
+# Version de este punto de impresion. Debe coincidir con la publicada
+# en el servidor (public/descargas/pos-version.json) al liberar un zip.
+POS_VERSION = "1.0.0"
+
 # ------------------------------------------------------------------
 # Plantillas de ticket
 # ------------------------------------------------------------------
@@ -74,6 +78,52 @@ def obtener_servidor():
         if url:
             return url.rstrip("/")
     return SERVIDOR_DEFAULT
+
+
+_version_cache = {"ultima": None, "consultada_en": 0}
+
+
+def obtener_ultima_version(forzar=False):
+    """ Ultima version publicada en el servidor (cache de 1 hora).
+        Devuelve None si no se pudo consultar. """
+    ahora = time.time()
+
+    if not forzar and (ahora - _version_cache["consultada_en"]) < 3600:
+        return _version_cache["ultima"]
+
+    try:
+        with urllib.request.urlopen(obtener_servidor() + "/descargas/pos-version.json", timeout=6) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        _version_cache["ultima"] = str(data.get("version") or "") or None
+    except Exception:
+        _version_cache["ultima"] = None
+
+    _version_cache["consultada_en"] = ahora
+    return _version_cache["ultima"]
+
+
+def verificar_version():
+    """ Compara la version local con la publicada y avisa si difieren. """
+    ultima = obtener_ultima_version(forzar=True)
+
+    if ultima is None:
+        print("[VER] No se pudo consultar la ultima version publicada; se continua normal.")
+        return
+
+    if ultima == POS_VERSION:
+        print(f"[VER] Version {POS_VERSION}: este punto de impresion esta al dia.")
+        return
+
+    print("!" * 55)
+    print("[VER] HAY UNA NUEVA VERSION DEL PUNTO DE IMPRESION")
+    print(f"      Instalada aqui: {POS_VERSION}   |   Publicada: {ultima}")
+    print("")
+    print("      Un ADMINISTRADOR debe actualizar este equipo asi:")
+    print("      1) Entrar a la ticketera con su cuenta de administrador")
+    print("      2) Configuracion > Instalador POS > Descargar ticketera-pos.zip")
+    print("      3) Reemplazar los archivos en C:\\ticketera-pos")
+    print("      4) Cerrar esta ventana y ejecutar instalar.bat")
+    print("!" * 55)
 
 
 def guardar_plantilla_sincronizada(almacen, template_id, nombre, config):
@@ -574,6 +624,8 @@ def estado():
     impresora = obtener_impresora()
     instaladas = impresoras_instaladas()
 
+    ultima = obtener_ultima_version()
+
     return jsonify({
         "status": "success",
         "impresora": impresora,
@@ -582,6 +634,9 @@ def estado():
         "config_por_archivo": os.path.exists(IMPRESORA_FILE),
         "plantillas_registradas": len(cargar_templates()["templates"]),
         "servidor": obtener_servidor(),
+        "version": POS_VERSION,
+        "ultima_version": ultima,
+        "actualizado": (ultima is None) or (ultima == POS_VERSION),
     })
 
 
@@ -718,13 +773,14 @@ if __name__ == '__main__':
     origen = "impresora.txt" if os.path.exists(IMPRESORA_FILE) else "predeterminada de Windows"
 
     print("=" * 55)
-    print("API de impresion ticketera-pos - http://127.0.0.1:5000/")
+    print(f"API de impresion ticketera-pos v{POS_VERSION} - http://127.0.0.1:5000/")
     print(f"Impresora ({origen}): {impresora}")
     print("Reconocida por Windows: " + ("SI" if disponible else "NO - revisar conexion o impresora.txt"))
     print(f"Servidor: {obtener_servidor()}")
     print("=" * 55)
 
-    # Alinear las plantillas con la web antes de empezar a imprimir
+    # Alinear las plantillas con la web y validar la version publicada
     sincronizar_plantillas()
+    verificar_version()
 
     app.run(host='0.0.0.0', port=5000)
