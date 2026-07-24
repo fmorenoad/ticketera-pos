@@ -2,5 +2,6 @@ qr_temp.bmp
 templates.json
 impresora.txt
 servidor.txt
+sucursal.txt
 __pycache__/
 *.pyc

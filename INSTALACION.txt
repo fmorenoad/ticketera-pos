@@ -26,6 +26,16 @@ INSTALACION EN 3 PASOS
 
    - Sin este archivo se usa la impresora predeterminada de Windows.
 
+3b. Indicar la tienda (SOLO si hay varias sucursales)
+   - Crear un archivo de texto llamado: sucursal.txt (en esta carpeta)
+   - Escribir dentro SOLO el CODIGO de la sucursal de este equipo, tal
+     como aparece en el sistema (Admin > Sucursales). Ejemplo:
+
+     MATRIZ
+
+   - Con esto el POS sincroniza e imprime las plantillas de SU tienda.
+   - Con una sola tienda, este archivo no es necesario.
+
 USO DIARIO
 ----------
 - instalar.bat: sirve siempre; verifica todo y abre el kiosko.
