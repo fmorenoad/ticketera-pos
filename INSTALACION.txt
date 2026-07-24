@@ -4,36 +4,41 @@ INSTALACION DEL PUNTO DE IMPRESION - TICKETERA
 Requisitos: PC con Windows 10/11, impresora termica conectada por USB,
 y Google Chrome instalado.
 
-1. Instalar Python (solo la primera vez)
-   - Descargar desde https://www.python.org/downloads/
-   - IMPORTANTE: marcar la casilla "Add Python to PATH" al instalar.
+INSTALACION EN 3 PASOS
+----------------------
 
-2. Copiar esta carpeta completa a C:\ticketera-pos
+1. Copiar esta carpeta completa a C:\ticketera-pos
 
-3. Ejecutar instalar_dependencias.bat (doble clic)
-   Instala las librerias necesarias. Solo la primera vez.
+2. Ejecutar instalar.bat (doble clic)
+   - Instala Python automaticamente si falta (puede pedir confirmacion).
+   - Instala las dependencias si faltan.
+   - Si ya esta todo instalado, muestra "YA ESTA TODO LISTO" y abre
+     el kiosko directamente.
+   - Nota: si tuvo que instalar Python, puede pedirte cerrarlo y
+     ejecutarlo una segunda vez.
 
-4. Indicar la impresora termica
+3. Indicar la impresora termica (recomendado)
    - Crear un archivo de texto llamado: impresora.txt (en esta carpeta)
    - Escribir dentro SOLO el nombre exacto de la impresora tal como
      aparece en Windows (Configuracion > Impresoras). Ejemplo:
 
      XP-80C
 
-   - Si no se crea el archivo, se usara la impresora predeterminada
-     de Windows.
+   - Sin este archivo se usa la impresora predeterminada de Windows.
 
-5. Operar
-   - abrir_kiosko.bat: levanta el servicio de impresion y abre la
-     ticketera en Chrome a pantalla completa (uso normal de la caja).
-   - iniciar_impresion.bat: levanta solo el servicio de impresion.
+USO DIARIO
+----------
+- instalar.bat: sirve siempre; verifica todo y abre el kiosko.
+- abrir_kiosko.bat: levanta el servicio de impresion y abre la
+  ticketera en Chrome a pantalla completa.
+- iniciar_impresion.bat: levanta solo el servicio de impresion.
 
 Verificacion rapida: con el servicio corriendo, abrir en el navegador
 http://127.0.0.1:5000/status : debe indicar la impresora y
 "impresora_disponible": true. Las plantillas de ticket se sincronizan
 solas desde el servidor al iniciar.
 
-Problemas frecuentes
+PROBLEMAS FRECUENTES
 --------------------
 - La cola de impresion queda "Error" con la impresora conectada:
   el driver USB pudo quedar tomado por una utilidad del fabricante
