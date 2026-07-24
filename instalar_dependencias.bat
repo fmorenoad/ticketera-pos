@@ -1,21 +1,33 @@
 @echo off
-echo 🚀 Instalando dependencias necesarias para la impresión...
+setlocal
+cd /d "%~dp0"
 
-:: Reinstalar pywin32
-echo 🔹 Instalando pywin32...
-pip install --force-reinstall pywin32
+echo ============================================
+echo  Instalador de dependencias - ticketera-pos
+echo ============================================
+echo.
 
-:: Instalar qrcode con soporte para PIL
-echo 🔹 Instalando qrcode...
-pip install qrcode[pil]
+where python >nul 2>nul
+if errorlevel 1 (
+    echo [ERROR] Python no esta instalado o no esta en el PATH.
+    echo Descargalo desde https://www.python.org/downloads/
+    echo y marca "Add Python to PATH" durante la instalacion.
+    pause
+    exit /b 1
+)
 
-:: Instalar Flask
-echo 🔹 Instalando Flask...
-pip install flask
+echo [1/2] Actualizando pip...
+python -m pip install --upgrade pip
 
-:: Instalar Flask-CORS
-echo 🔹 Instalando Flask-CORS...
-pip install flask-cors
+echo [2/2] Instalando dependencias desde requirements.txt...
+python -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo [ERROR] Fallo la instalacion de dependencias.
+    pause
+    exit /b 1
+)
 
-echo ✅ Instalación completada. ¡Tu entorno está listo!
+echo.
+echo [OK] Instalacion completada. El entorno esta listo.
+echo Ejecuta iniciar_impresion.bat para levantar el servicio de impresion.
 pause

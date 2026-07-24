@@ -1,7 +1,13 @@
 @echo off
-REM Ejecutar un archivo antes de abrir el navegador
-start "" "C:\ticketera-pos\iniciar_impresion.bat"
-REM Esperar unos segundos para que el archivo se ejecute
+REM Levantar el servicio de impresion (misma carpeta que este script)
+start "" "%~dp0iniciar_impresion.bat"
+
+REM Esperar a que el servicio arranque
 timeout /t 2 /nobreak >nul
+
 REM Abrir Chrome en modo kiosko
-start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk --disable-translate "https://ticketera.iwan.cl"
+if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
+    start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk --disable-translate "https://ticketera.iwan.cl"
+) else (
+    start "" "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --kiosk --disable-translate "https://ticketera.iwan.cl"
+)
