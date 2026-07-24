@@ -261,7 +261,7 @@ def imprimir_ticket(ticket, plantilla=None):
     # Variables
     qr_size = 400
     x = 10
-    y = 100
+    y = 15  # margen superior minimo
 
     # Definir fuentes
     normal_font = win32ui.CreateFont({
@@ -365,7 +365,7 @@ def imprimir_resumen(cantidad_tickets):
 
     # Variables
     x = 10
-    y = 100
+    y = 15  # margen superior minimo
 
     # Definir fuente
     normal_font = win32ui.CreateFont({
@@ -412,7 +412,7 @@ def imprimir_ticket_cierre_turno(titulo, datos):
     """ Imprime el comprobante de cierre de turno """
 
     x = 10
-    y = 100
+    y = 15  # margen superior minimo
 
     # Definir fuentes
     title_font = win32ui.CreateFont({"name": "Arial", "height": 50, "weight": 700})
@@ -506,7 +506,7 @@ def imprimir_ticket_retiro(titulo, datos):
     """ Imprime el comprobante de retiro de dinero """
 
     x = 10
-    y = 100
+    y = 15  # margen superior minimo
 
     # Definir fuentes
     title_font = win32ui.CreateFont({"name": "Arial", "height": 50, "weight": 700})
