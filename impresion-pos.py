@@ -3,6 +3,7 @@ import win32ui
 import qrcode
 import json
 import os
+import urllib.request
 from PIL import Image, ImageWin
 from flask import Flask, request, jsonify
 from flask_cors import CORS  # Permitir solicitudes desde Laravel
@@ -55,6 +56,72 @@ def impresoras_instaladas():
     """ Nombres de todas las impresoras que reconoce Windows """
     flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
     return [p[2] for p in win32print.EnumPrinters(flags)]
+
+
+# ------------------------------------------------------------------
+# Servidor de la ticketera (para sincronizar la plantilla activa)
+# ------------------------------------------------------------------
+SERVIDOR_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "servidor.txt")
+SERVIDOR_DEFAULT = "https://ticketera.iwan.cl"
+
+
+def obtener_servidor():
+    """ URL del servidor: la de servidor.txt (junto al script) o la por defecto """
+    if os.path.exists(SERVIDOR_FILE):
+        with open(SERVIDOR_FILE, "r", encoding="utf-8-sig") as f:
+            url = f.read().strip()
+        if url:
+            return url.rstrip("/")
+    return SERVIDOR_DEFAULT
+
+
+def sincronizar_plantilla_activa():
+    """ Consulta al servidor cual es la plantilla activa y actualiza (o
+        descarga) la copia local para que coincida con la web. """
+    url = obtener_servidor() + "/api/plantilla-activa"
+
+    try:
+        with urllib.request.urlopen(url, timeout=8) as respuesta:
+            data = json.loads(respuesta.read().decode("utf-8"))
+    except Exception as e:
+        mensaje = f"Sin conexion con el servidor ({e}); se usan las plantillas locales."
+        print(f"[SYNC] {mensaje}")
+        return {"sincronizada": False, "mensaje": mensaje}
+
+    if not data.get("active"):
+        mensaje = "El servidor no tiene plantilla activa; se usa el formato por defecto."
+        print(f"[SYNC] {mensaje}")
+        return {"sincronizada": False, "mensaje": mensaje}
+
+    template_id = str(data.get("template_id") or "")
+
+    if not template_id:
+        mensaje = "La plantilla activa del servidor aun no tiene id de POS (enviala desde la web una vez)."
+        print(f"[SYNC] {mensaje}")
+        return {"sincronizada": False, "mensaje": mensaje}
+
+    payload = dict(data.get("config") or {})
+    payload["nombre"] = data.get("nombre") or "Plantilla activa"
+    plantilla = normalizar_plantilla(payload)
+
+    almacen = cargar_templates()
+    anterior = almacen["templates"].get(template_id)
+    almacen["templates"][template_id] = plantilla
+
+    if template_id.isdigit() and int(template_id) >= almacen["next_id"]:
+        almacen["next_id"] = int(template_id) + 1
+
+    guardar_templates(almacen)
+
+    if anterior is None:
+        mensaje = f"Plantilla activa {template_id} ('{plantilla['nombre']}') descargada del servidor."
+    elif anterior != plantilla:
+        mensaje = f"Plantilla activa {template_id} ('{plantilla['nombre']}') actualizada desde el servidor."
+    else:
+        mensaje = f"Plantilla activa {template_id} ('{plantilla['nombre']}') ya estaba al dia."
+
+    print(f"[SYNC] {mensaje}")
+    return {"sincronizada": True, "template_id": template_id, "mensaje": mensaje}
 
 
 def cargar_templates():
@@ -438,7 +505,15 @@ def estado():
         "impresoras_instaladas": instaladas,
         "config_por_archivo": os.path.exists(IMPRESORA_FILE),
         "plantillas_registradas": len(cargar_templates()["templates"]),
+        "servidor": obtener_servidor(),
     })
+
+
+@app.route('/templates/sync', methods=['POST'])
+def sincronizar_endpoint():
+    """ Re-sincroniza la plantilla activa desde el servidor sin reiniciar """
+    resultado = sincronizar_plantilla_activa()
+    return jsonify({"status": "success", **resultado})
 
 
 @app.route('/templates', methods=['POST'])
@@ -570,6 +645,10 @@ if __name__ == '__main__':
     print("API de impresion ticketera-pos - http://127.0.0.1:5000/")
     print(f"Impresora ({origen}): {impresora}")
     print("Reconocida por Windows: " + ("SI" if disponible else "NO - revisar conexion o impresora.txt"))
+    print(f"Servidor: {obtener_servidor()}")
     print("=" * 55)
+
+    # Alinear la plantilla activa con la web antes de empezar a imprimir
+    sincronizar_plantilla_activa()
 
     app.run(host='0.0.0.0', port=5000)
