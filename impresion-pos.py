@@ -5,6 +5,7 @@ import json
 import os
 import urllib.request
 import urllib.error
+import urllib.parse
 from PIL import Image, ImageWin
 from flask import Flask, request, jsonify
 from flask_cors import CORS  # Permitir solicitudes desde Laravel
@@ -80,6 +81,31 @@ def obtener_servidor():
     return SERVIDOR_DEFAULT
 
 
+# Sucursal (tienda) de ESTE POS: cada tienda tiene sus propias plantillas.
+# En sucursal.txt (junto al script) va el CODIGO de la sucursal (ej. MATRIZ,
+# CENTRO). Sin archivo: el servidor responde con su sucursal por defecto.
+SUCURSAL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sucursal.txt")
+
+
+def obtener_sucursal():
+    """ Codigo de sucursal de este POS (sucursal.txt) o None """
+    if os.path.exists(SUCURSAL_FILE):
+        with open(SUCURSAL_FILE, "r", encoding="utf-8-sig") as f:
+            codigo = f.read().strip()
+        if codigo:
+            return codigo.upper()
+    return None
+
+
+def url_con_sucursal(url):
+    """ Agrega ?sucursal=CODIGO a la URL si este POS tiene sucursal configurada """
+    codigo = obtener_sucursal()
+    if codigo:
+        separador = "&" if "?" in url else "?"
+        return url + separador + "sucursal=" + urllib.parse.quote(codigo)
+    return url
+
+
 _version_cache = {"ultima": None, "consultada_en": 0}
 
 
@@ -150,7 +176,7 @@ def sincronizar_plantillas():
     """ Descarga TODAS las plantillas del servidor (la activa al final,
         para que prevalezca ante ids en conflicto). Si el servidor es
         antiguo y no tiene el endpoint, cae al de plantilla activa. """
-    url = obtener_servidor() + "/api/plantillas"
+    url = url_con_sucursal(obtener_servidor() + "/api/plantillas")
 
     try:
         with urllib.request.urlopen(url, timeout=8) as respuesta:
@@ -204,7 +230,7 @@ def sincronizar_plantillas():
 def sincronizar_plantilla_activa():
     """ Consulta al servidor cual es la plantilla activa y actualiza (o
         descarga) la copia local para que coincida con la web. """
-    url = obtener_servidor() + "/api/plantilla-activa"
+    url = url_con_sucursal(obtener_servidor() + "/api/plantilla-activa")
 
     try:
         with urllib.request.urlopen(url, timeout=8) as respuesta:
