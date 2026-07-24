@@ -33,6 +33,29 @@ DEFAULT_TEMPLATE = {
 # Campos que una plantilla puede definir; todo lo demas se ignora
 CAMPOS_PLANTILLA = list(DEFAULT_TEMPLATE.keys())
 
+# ------------------------------------------------------------------
+# Impresora
+# ------------------------------------------------------------------
+IMPRESORA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "impresora.txt")
+
+
+def obtener_impresora():
+    """ Impresora a usar: la indicada en impresora.txt (junto al script),
+        o la predeterminada de Windows si el archivo no existe. """
+    if os.path.exists(IMPRESORA_FILE):
+        # utf-8-sig tolera el BOM que agregan el Bloc de notas y PowerShell
+        with open(IMPRESORA_FILE, "r", encoding="utf-8-sig") as f:
+            nombre = f.read().strip()
+        if nombre:
+            return nombre
+    return win32print.GetDefaultPrinter()
+
+
+def impresoras_instaladas():
+    """ Nombres de todas las impresoras que reconoce Windows """
+    flags = win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS
+    return [p[2] for p in win32print.EnumPrinters(flags)]
+
 
 def cargar_templates():
     """ Lee templates.json; estructura: {"next_id": int, "templates": {id: config}} """
@@ -58,28 +81,33 @@ def normalizar_plantilla(payload):
             plantilla[campo] = payload[campo]
     return plantilla
 
+
 def centrar_texto(pdc, texto):
-    """ Calcula la posición X para centrar un texto en la impresora """
+    """ Calcula la posicion X para centrar un texto en la impresora """
     printer_width = pdc.GetDeviceCaps(8)
     text_width, _ = pdc.GetTextExtent(texto)
     return (printer_width - text_width) // 2
 
+
 def generar_qr(code):
-    """ Genera un código QR y lo devuelve como una imagen DIB """
+    """ Genera un codigo QR y lo devuelve como una imagen DIB """
     qr = qrcode.make(code)
     qr_path = "qr_temp.bmp"
     qr.save(qr_path)
     qr_image = Image.open(qr_path)
     return ImageWin.Dib(qr_image)
 
+
 def centrar_qr(pdc, qr_size=400):
-    """ Calcula la posición X para centrar un código QR """
+    """ Calcula la posicion X para centrar un codigo QR """
     printer_width = pdc.GetDeviceCaps(8)
     return (printer_width - qr_size) // 2
 
+
 def mover_y(y, espacio=30):
-    """ Aumenta la posición en Y para hacer un salto de línea """
+    """ Aumenta la posicion en Y para hacer un salto de linea """
     return y + espacio
+
 
 def imprimir_ticket(ticket, plantilla=None):
     """ Imprime UN ticket usando la plantilla indicada (o la por defecto) """
@@ -115,7 +143,7 @@ def imprimir_ticket(ticket, plantilla=None):
     })
 
     # Configurar impresora
-    printer_name = win32print.GetDefaultPrinter()
+    printer_name = obtener_impresora()
     hprinter = win32print.OpenPrinter(printer_name)
     pdc = win32ui.CreateDC()
     pdc.CreatePrinterDC(printer_name)
@@ -175,17 +203,18 @@ def imprimir_ticket(ticket, plantilla=None):
         pdc.TextOut(centrar_texto(pdc, pie), y, pie)
         y = mover_y(y, 30)
 
-    # Finalizar impresión
+    # Finalizar impresion
     pdc.EndPage()
     pdc.EndDoc()
     pdc.DeleteDC()
 
-    print(f"✅ Ticket {ticket['id']} impreso correctamente")
+    print(f"[OK] Ticket {ticket['id']} impreso correctamente")
+
 
 def imprimir_resumen(cantidad_tickets):
-    """ Imprime un resumen después de imprimir todos los tickets """
+    """ Imprime un resumen despues de imprimir todos los tickets """
 
-    # Pequeña espera para liberar la impresora
+    # Pequena espera para liberar la impresora
     time.sleep(1)
 
     # Obtener la hora actual
@@ -199,9 +228,9 @@ def imprimir_resumen(cantidad_tickets):
     normal_font = win32ui.CreateFont({
         "name": "Arial",
         "height": 30,
-        "weight": 300  # Negrita
+        "weight": 300
     })
-    
+
     title_font = win32ui.CreateFont({
         "name": "Arial",
         "height": 50,
@@ -209,7 +238,7 @@ def imprimir_resumen(cantidad_tickets):
     })
 
     # Configurar impresora
-    printer_name = win32print.GetDefaultPrinter()
+    printer_name = obtener_impresora()
     hprinter = win32print.OpenPrinter(printer_name)
     pdc = win32ui.CreateDC()
     pdc.CreatePrinterDC(printer_name)
@@ -220,23 +249,24 @@ def imprimir_resumen(cantidad_tickets):
     pdc.SelectObject(title_font)
     pdc.TextOut(centrar_texto(pdc, "COMPROBANTE DE VENTA"), y, "COMPROBANTE DE VENTA")
     y = mover_y(y, 50)
-    
+
     pdc.SelectObject(normal_font)
 
     pdc.TextOut(centrar_texto(pdc, f"Total Tickets: {cantidad_tickets}"), y, f"Total Tickets: {cantidad_tickets}")
     y = mover_y(y, 30)
 
-    pdc.TextOut(centrar_texto(pdc, f"Hora de Impresión: {hora_impresion}"), y, f"Hora de Impresión: {hora_impresion}")
+    pdc.TextOut(centrar_texto(pdc, f"Hora de Impresion: {hora_impresion}"), y, f"Hora de Impresion: {hora_impresion}")
     y = mover_y(y, 30)
 
     pdc.EndPage()
     pdc.EndDoc()
     pdc.DeleteDC()
 
-    print(f"📄 Resumen impreso: {cantidad_tickets} tickets, Hora: {hora_impresion}")
-    
+    print(f"[OK] Resumen impreso: {cantidad_tickets} tickets, Hora: {hora_impresion}")
+
+
 def imprimir_ticket_cierre_turno(titulo, datos):
-    """ Imprime un ticket genérico con título y datos """
+    """ Imprime el comprobante de cierre de turno """
 
     x = 10
     y = 100
@@ -248,7 +278,7 @@ def imprimir_ticket_cierre_turno(titulo, datos):
     manager_font = win32ui.CreateFont({"name": "Arial", "height": 30, "weight": 500})
 
     # Configurar impresora
-    printer_name = win32print.GetDefaultPrinter()
+    printer_name = obtener_impresora()
     hprinter = win32print.OpenPrinter(printer_name)
     pdc = win32ui.CreateDC()
     pdc.CreatePrinterDC(printer_name)
@@ -263,58 +293,56 @@ def imprimir_ticket_cierre_turno(titulo, datos):
     texto = " -----------------------------------------------"
     pdc.TextOut(centrar_texto(pdc, texto), y, texto)
     y = mover_y(y, 100)
-    
-    
+
     texto = f"ID de Turno: {datos['turn_id']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 30)
-        
+
     texto = f"Fecha de Turno: {datos['fecha']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 30)
-    
+
     texto = f"Fecha inicio de Turno: {datos['fecha_inicio']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 30)
-    
+
     texto = f"Fecha fin de Turno: {datos['fecha_fin']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 30)
-    
+
     texto = f"Usuario: {datos['user']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 30)
-    
-    
-    pdc.SelectObject(amount_font)  
+
+    pdc.SelectObject(amount_font)
     texto = " -----------------------------------------------"
     pdc.TextOut(centrar_texto(pdc, texto), y, texto)
     y = mover_y(y, 70)
-    
+
     texto = f"Inicial en caja: ${datos['inicial_caja']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 50)
-    
-    pdc.SelectObject(amount_font)    
+
+    pdc.SelectObject(amount_font)
     texto = f"Total vendido: ${datos['total_recaudado']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 50)
-    
-    pdc.SelectObject(amount_font)    
+
+    pdc.SelectObject(amount_font)
     texto = f"Total retiros: ${datos['entregas']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 50)
-    
-    pdc.SelectObject(amount_font)    
+
+    pdc.SelectObject(amount_font)
     texto = f"Entrega final: ${datos['entrega_final']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 70)
-    
+
     texto = " -----------------------------------------------"
     pdc.TextOut(centrar_texto(pdc, texto), y, texto)
-    
+
     y = mover_y(y, 100)
-    
+
     pdc.SelectObject(manager_font)
     texto = "Retira: _________________________________"
     pdc.TextOut(x, y, texto)
@@ -322,25 +350,17 @@ def imprimir_ticket_cierre_turno(titulo, datos):
     texto = "Firma: _________________________________"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 150)
-    # Imprimir cada línea de datos
-    
-    
-    # pdc.TextOut(centrar_texto(pdc, line), y, line)
-    # y = mover_y(y, 30)
-    # for key, value in datos.items():
-    #     line = f"{key}: {value}"
-    #     pdc.TextOut(centrar_texto(pdc, line), y, line)
-    #     y = mover_y(y, 30)
 
-    # Finalizar impresión
+    # Finalizar impresion
     pdc.EndPage()
     pdc.EndDoc()
     pdc.DeleteDC()
 
-    print(f"✅ {titulo} impreso correctamente")
-    
+    print(f"[OK] {titulo} impreso correctamente")
+
+
 def imprimir_ticket_retiro(titulo, datos):
-    """ Imprime un ticket genérico con título y datos """
+    """ Imprime el comprobante de retiro de dinero """
 
     x = 10
     y = 100
@@ -352,7 +372,7 @@ def imprimir_ticket_retiro(titulo, datos):
     manager_font = win32ui.CreateFont({"name": "Arial", "height": 30, "weight": 500})
 
     # Configurar impresora
-    printer_name = win32print.GetDefaultPrinter()
+    printer_name = obtener_impresora()
     hprinter = win32print.OpenPrinter(printer_name)
     pdc = win32ui.CreateDC()
     pdc.CreatePrinterDC(printer_name)
@@ -367,29 +387,28 @@ def imprimir_ticket_retiro(titulo, datos):
     texto = " -----------------------------------------------"
     pdc.TextOut(centrar_texto(pdc, texto), y, texto)
     y = mover_y(y, 150)
-    
-    
+
     texto = f"ID de Turno: {datos['turno_id']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 30)
-    
+
     texto = f"ID de Retiro: {datos['retiro_id']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 30)
-    
+
     texto = f"Fecha de Turno: {datos['turno_date']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 30)
-    
+
     texto = f"Usuario: {datos['usuario']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 30)
-    
-    pdc.SelectObject(amount_font)    
+
+    pdc.SelectObject(amount_font)
     texto = f"Monto retirado: {datos['monto_retirado']}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 100)
-    
+
     pdc.SelectObject(manager_font)
     texto = "Retira: _________________________________"
     pdc.TextOut(x, y, texto)
@@ -397,22 +416,31 @@ def imprimir_ticket_retiro(titulo, datos):
     texto = "Firma: _________________________________"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 150)
-    # Imprimir cada línea de datos
-    
-    
-    # pdc.TextOut(centrar_texto(pdc, line), y, line)
-    # y = mover_y(y, 30)
-    # for key, value in datos.items():
-    #     line = f"{key}: {value}"
-    #     pdc.TextOut(centrar_texto(pdc, line), y, line)
-    #     y = mover_y(y, 30)
 
-    # Finalizar impresión
+    # Finalizar impresion
     pdc.EndPage()
     pdc.EndDoc()
     pdc.DeleteDC()
 
-    print(f"✅ {titulo} impreso correctamente")
+    print(f"[OK] {titulo} impreso correctamente")
+
+
+@app.route('/status', methods=['GET'])
+def estado():
+    """ Diagnostico: impresora configurada, si Windows la reconoce y plantillas """
+    impresora = obtener_impresora()
+    instaladas = impresoras_instaladas()
+
+    return jsonify({
+        "status": "success",
+        "impresora": impresora,
+        "impresora_disponible": impresora in instaladas,
+        "impresoras_instaladas": instaladas,
+        "config_por_archivo": os.path.exists(IMPRESORA_FILE),
+        "plantillas_registradas": len(cargar_templates()["templates"]),
+    })
+
+
 @app.route('/templates', methods=['POST'])
 def recibir_template():
     """ Recibe una plantilla desde la web, la guarda y devuelve su id.
@@ -425,7 +453,7 @@ def recibir_template():
         plantilla = normalizar_plantilla(payload)
 
         if not plantilla["titulo"] and not plantilla["subtitulo"]:
-            return jsonify({"status": "error", "message": "La plantilla debe tener al menos un título o subtítulo"}), 422
+            return jsonify({"status": "error", "message": "La plantilla debe tener al menos un titulo o subtitulo"}), 422
 
         data = cargar_templates()
 
@@ -440,12 +468,12 @@ def recibir_template():
             mensaje = f"Plantilla {template_id} registrada"
 
         guardar_templates(data)
-        print(f"📋 {mensaje}: {plantilla['nombre']}")
+        print(f"[TPL] {mensaje}: {plantilla['nombre']}")
 
         return jsonify({"status": "success", "message": mensaje, "template_id": template_id})
 
     except Exception as e:
-        print(f"❌ Error al guardar plantilla: {e}")
+        print(f"[ERROR] Al guardar plantilla: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
@@ -474,7 +502,7 @@ def receive_tickets():
 
             registradas = cargar_templates()["templates"]
             if template_id not in registradas:
-                return jsonify({"status": "error", "message": f"La plantilla {template_id} no está registrada en este POS. Envíala desde la web antes de imprimir."}), 404
+                return jsonify({"status": "error", "message": f"La plantilla {template_id} no esta registrada en este POS. Enviala desde la web antes de imprimir."}), 404
 
             plantilla = registradas[template_id]
         else:
@@ -495,8 +523,9 @@ def receive_tickets():
         return jsonify({"status": "success", "message": f"Se imprimieron {len(tickets)} tickets"})
 
     except Exception as e:
-        print(f"❌ Error en la API: {e}")
+        print(f"[ERROR] En la API: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/print/retiro', methods=['POST'])
 def imprimir_retiro():
@@ -511,8 +540,9 @@ def imprimir_retiro():
         return jsonify({"status": "success", "message": "Comprobante de retiro impreso"})
 
     except Exception as e:
-        print(f"❌ Error al imprimir retiro: {e}")
+        print(f"[ERROR] Al imprimir retiro: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/print/cierre', methods=['POST'])
 def imprimir_cierre():
@@ -527,9 +557,19 @@ def imprimir_cierre():
         return jsonify({"status": "success", "message": "Comprobante de cierre impreso"})
 
     except Exception as e:
-        print(f"❌ Error al imprimir cierre de caja: {e}")
+        print(f"[ERROR] Al imprimir cierre de caja: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
-    
+
+
 if __name__ == '__main__':
-    print("🔥 API de impresión ejecutándose en http://127.0.0.1:5000/")
+    impresora = obtener_impresora()
+    disponible = impresora in impresoras_instaladas()
+    origen = "impresora.txt" if os.path.exists(IMPRESORA_FILE) else "predeterminada de Windows"
+
+    print("=" * 55)
+    print("API de impresion ticketera-pos - http://127.0.0.1:5000/")
+    print(f"Impresora ({origen}): {impresora}")
+    print("Reconocida por Windows: " + ("SI" if disponible else "NO - revisar conexion o impresora.txt"))
+    print("=" * 55)
+
     app.run(host='0.0.0.0', port=5000)
