@@ -4,6 +4,7 @@ import qrcode
 import json
 import os
 import urllib.request
+import urllib.error
 from PIL import Image, ImageWin
 from flask import Flask, request, jsonify
 from flask_cors import CORS  # Permitir solicitudes desde Laravel
@@ -73,6 +74,81 @@ def obtener_servidor():
         if url:
             return url.rstrip("/")
     return SERVIDOR_DEFAULT
+
+
+def guardar_plantilla_sincronizada(almacen, template_id, nombre, config):
+    """ Upsert de una plantilla del servidor en el almacen local.
+        Devuelve 'nueva', 'actualizada' o 'al_dia'. """
+    payload = dict(config or {})
+    payload["nombre"] = nombre or "Plantilla"
+    plantilla = normalizar_plantilla(payload)
+
+    anterior = almacen["templates"].get(template_id)
+    almacen["templates"][template_id] = plantilla
+
+    if template_id.isdigit() and int(template_id) >= almacen["next_id"]:
+        almacen["next_id"] = int(template_id) + 1
+
+    if anterior is None:
+        return "nueva"
+    if anterior != plantilla:
+        return "actualizada"
+    return "al_dia"
+
+
+def sincronizar_plantillas():
+    """ Descarga TODAS las plantillas del servidor (la activa al final,
+        para que prevalezca ante ids en conflicto). Si el servidor es
+        antiguo y no tiene el endpoint, cae al de plantilla activa. """
+    url = obtener_servidor() + "/api/plantillas"
+
+    try:
+        with urllib.request.urlopen(url, timeout=8) as respuesta:
+            data = json.loads(respuesta.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print("[SYNC] Servidor sin endpoint de catalogo; sincronizando solo la activa.")
+            return sincronizar_plantilla_activa()
+        mensaje = f"El servidor respondio {e.code}; se usan las plantillas locales."
+        print(f"[SYNC] {mensaje}")
+        return {"sincronizada": False, "mensaje": mensaje}
+    except Exception as e:
+        mensaje = f"Sin conexion con el servidor ({e}); se usan las plantillas locales."
+        print(f"[SYNC] {mensaje}")
+        return {"sincronizada": False, "mensaje": mensaje}
+
+    lista = data.get("templates") or []
+
+    if not lista:
+        mensaje = "El servidor no tiene plantillas registradas en POS todavia."
+        print(f"[SYNC] {mensaje}")
+        return {"sincronizada": True, "total": 0, "mensaje": mensaje}
+
+    # La activa se aplica al final para que gane ante ids duplicados
+    lista.sort(key=lambda t: 1 if t.get("active") else 0)
+
+    almacen = cargar_templates()
+    nuevas = 0
+    actualizadas = 0
+
+    for t in lista:
+        template_id = str(t.get("template_id") or "")
+        if not template_id:
+            continue
+
+        resultado = guardar_plantilla_sincronizada(almacen, template_id, t.get("nombre"), t.get("config"))
+
+        if resultado == "nueva":
+            nuevas += 1
+        elif resultado == "actualizada":
+            actualizadas += 1
+
+    guardar_templates(almacen)
+
+    mensaje = f"{len(lista)} plantillas del servidor: {nuevas} nuevas, {actualizadas} actualizadas, {len(lista) - nuevas - actualizadas} al dia."
+    print(f"[SYNC] {mensaje}")
+
+    return {"sincronizada": True, "total": len(lista), "nuevas": nuevas, "actualizadas": actualizadas, "mensaje": mensaje}
 
 
 def sincronizar_plantilla_activa():
@@ -511,8 +587,8 @@ def estado():
 
 @app.route('/templates/sync', methods=['POST'])
 def sincronizar_endpoint():
-    """ Re-sincroniza la plantilla activa desde el servidor sin reiniciar """
-    resultado = sincronizar_plantilla_activa()
+    """ Re-sincroniza todas las plantillas desde el servidor sin reiniciar """
+    resultado = sincronizar_plantillas()
     return jsonify({"status": "success", **resultado})
 
 
@@ -648,7 +724,7 @@ if __name__ == '__main__':
     print(f"Servidor: {obtener_servidor()}")
     print("=" * 55)
 
-    # Alinear la plantilla activa con la web antes de empezar a imprimir
-    sincronizar_plantilla_activa()
+    # Alinear las plantillas con la web antes de empezar a imprimir
+    sincronizar_plantillas()
 
     app.run(host='0.0.0.0', port=5000)
