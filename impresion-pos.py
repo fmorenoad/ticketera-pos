@@ -17,7 +17,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})  # Habilitar CORS para todas las 
 
 # Version de este punto de impresion. Debe coincidir con la publicada
 # en el servidor (public/descargas/pos-version.json) al liberar un zip.
-POS_VERSION = "1.1.0"
+POS_VERSION = "1.2.0"
 
 # ------------------------------------------------------------------
 # Plantillas de ticket
@@ -104,6 +104,23 @@ def url_con_sucursal(url):
         separador = "&" if "?" in url else "?"
         return url + separador + "sucursal=" + urllib.parse.quote(codigo)
     return url
+
+
+# Caja (punto de venta) de ESTE equipo: identificacion para soporte y
+# diagnostico. La asociacion operativa de la caja ocurre en la web (el
+# cajero abre su turno eligiendo la caja, y el lector de tarjetas se
+# asigna a la caja en Configuracion > POS Mercado Pago).
+CAJA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "caja.txt")
+
+
+def obtener_caja():
+    """ Nombre de la caja de este equipo (caja.txt) o None """
+    if os.path.exists(CAJA_FILE):
+        with open(CAJA_FILE, "r", encoding="utf-8-sig") as f:
+            nombre = f.read().strip()
+        if nombre:
+            return nombre
+    return None
 
 
 _version_cache = {"ultima": None, "consultada_en": 0}
@@ -660,6 +677,8 @@ def estado():
         "config_por_archivo": os.path.exists(IMPRESORA_FILE),
         "plantillas_registradas": len(cargar_templates()["templates"]),
         "servidor": obtener_servidor(),
+        "sucursal": obtener_sucursal(),
+        "caja": obtener_caja(),
         "version": POS_VERSION,
         "ultima_version": ultima,
         "actualizado": (ultima is None) or (ultima == POS_VERSION),
@@ -803,6 +822,8 @@ if __name__ == '__main__':
     print(f"Impresora ({origen}): {impresora}")
     print("Reconocida por Windows: " + ("SI" if disponible else "NO - revisar conexion o impresora.txt"))
     print(f"Servidor: {obtener_servidor()}")
+    print(f"Tienda (sucursal.txt): {obtener_sucursal() or 'no configurada - usa la tienda por defecto'}")
+    print(f"Caja (caja.txt): {obtener_caja() or 'no configurada'}")
     print("=" * 55)
 
     # Alinear las plantillas con la web y validar la version publicada

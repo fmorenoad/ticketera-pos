@@ -26,15 +26,35 @@ INSTALACION EN 3 PASOS
 
    - Sin este archivo se usa la impresora predeterminada de Windows.
 
-3b. Indicar la tienda (SOLO si hay varias sucursales)
-   - Crear un archivo de texto llamado: sucursal.txt (en esta carpeta)
-   - Escribir dentro SOLO el CODIGO de la sucursal de este equipo, tal
-     como aparece en el sistema (Admin > Sucursales). Ejemplo:
+4. Indicar la tienda y la caja de este equipo
+   a) TIENDA (obligatorio si hay varias sucursales):
+      - Crear un archivo de texto: sucursal.txt (en esta carpeta)
+      - Escribir SOLO el CODIGO de la tienda, tal como aparece en
+        Admin > Sucursales. Ejemplo:
 
-     MATRIZ
+        MATRIZ
 
-   - Con esto el POS sincroniza e imprime las plantillas de SU tienda.
-   - Con una sola tienda, este archivo no es necesario.
+      - Con esto el POS sincroniza e imprime las plantillas de SU
+        tienda. Con una sola tienda no es necesario.
+
+   b) CAJA (recomendado, identificacion del equipo):
+      - Crear un archivo de texto: caja.txt (en esta carpeta)
+      - Escribir el nombre de la caja tal como esta en el sistema.
+        Ejemplo:
+
+        Caja 1
+
+      - Aparece en el diagnostico (/status) y al iniciar el servicio,
+        para identificar el equipo en soporte.
+
+   IMPORTANTE - donde se asocia la caja operativamente:
+   - El CAJERO elige la caja al abrir su turno en la web.
+   - El LECTOR de tarjetas se asocia a la caja en la web:
+     Configuracion > POS Mercado Pago > Lectores por caja.
+   - Las PLANTILLAS de impresion son por TIENDA (sucursal.txt).
+
+   Verificacion rapida: http://127.0.0.1:5000/status debe mostrar la
+   impresora, la tienda (sucursal) y la caja configuradas.
 
 USO DIARIO
 ----------

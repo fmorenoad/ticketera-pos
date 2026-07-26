@@ -3,5 +3,6 @@ templates.json
 impresora.txt
 servidor.txt
 sucursal.txt
+caja.txt
 __pycache__/
 *.pyc
