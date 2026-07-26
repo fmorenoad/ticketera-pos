@@ -30,7 +30,7 @@ INSTALACION EN 3 PASOS
    a) TIENDA (obligatorio si hay varias sucursales):
       - Crear un archivo de texto: sucursal.txt (en esta carpeta)
       - Escribir SOLO el CODIGO de la tienda, tal como aparece en
-        Admin > Sucursales. Ejemplo:
+        Configuracion > Sucursales. Ejemplo:
 
         MATRIZ
 
