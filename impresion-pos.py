@@ -17,7 +17,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})  # Habilitar CORS para todas las 
 
 # Version de este punto de impresion. Debe coincidir con la publicada
 # en el servidor (public/descargas/pos-version.json) al liberar un zip.
-POS_VERSION = "1.3.0"
+POS_VERSION = "1.3.1"
 
 # ------------------------------------------------------------------
 # Plantillas de ticket
@@ -123,6 +123,20 @@ def obtener_caja():
     return None
 
 
+def abrir_url(url, timeout):
+    """ Peticion al servidor identificandose como este POS.
+
+        urllib manda "Python-urllib/x.y" y Cloudflare lo bloquea con 403
+        (Browser Integrity Check): la caja quedaba sin sincronizar
+        plantillas y sin poder consultar la version publicada, sin ninguna
+        pista de por que. Con un nombre propio pasa sin problema. """
+    pedido = urllib.request.Request(url, headers={
+        "User-Agent": f"ticketera-pos/{POS_VERSION} (+https://ticketera.colorpark.cl)",
+        "Accept": "application/json",
+    })
+    return urllib.request.urlopen(pedido, timeout=timeout)
+
+
 _version_cache = {"ultima": None, "consultada_en": 0}
 
 
@@ -135,7 +149,7 @@ def obtener_ultima_version(forzar=False):
         return _version_cache["ultima"]
 
     try:
-        with urllib.request.urlopen(obtener_servidor() + "/descargas/pos-version.json", timeout=6) as r:
+        with abrir_url(obtener_servidor() + "/descargas/pos-version.json", 6) as r:
             data = json.loads(r.read().decode("utf-8"))
         _version_cache["ultima"] = str(data.get("version") or "") or None
     except Exception:
@@ -196,7 +210,7 @@ def sincronizar_plantillas():
     url = url_con_sucursal(obtener_servidor() + "/api/plantillas")
 
     try:
-        with urllib.request.urlopen(url, timeout=8) as respuesta:
+        with abrir_url(url, 8) as respuesta:
             data = json.loads(respuesta.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         if e.code == 404:
@@ -250,7 +264,7 @@ def sincronizar_plantilla_activa():
     url = url_con_sucursal(obtener_servidor() + "/api/plantilla-activa")
 
     try:
-        with urllib.request.urlopen(url, timeout=8) as respuesta:
+        with abrir_url(url, 8) as respuesta:
             data = json.loads(respuesta.read().decode("utf-8"))
     except Exception as e:
         mensaje = f"Sin conexion con el servidor ({e}); se usan las plantillas locales."
