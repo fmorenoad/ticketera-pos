@@ -17,7 +17,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})  # Habilitar CORS para todas las 
 
 # Version de este punto de impresion. Debe coincidir con la publicada
 # en el servidor (public/descargas/pos-version.json) al liberar un zip.
-POS_VERSION = "1.2.0"
+POS_VERSION = "1.3.0"
 
 # ------------------------------------------------------------------
 # Plantillas de ticket
@@ -68,7 +68,7 @@ def impresoras_instaladas():
 # Servidor de la ticketera (para sincronizar la plantilla activa)
 # ------------------------------------------------------------------
 SERVIDOR_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "servidor.txt")
-SERVIDOR_DEFAULT = "https://ticketera.iwan.cl"
+SERVIDOR_DEFAULT = "https://ticketera.colorpark.cl"
 
 
 def obtener_servidor():
@@ -680,8 +680,12 @@ def estado():
         "sucursal": obtener_sucursal(),
         "caja": obtener_caja(),
         "version": POS_VERSION,
+        # ultima_version en None = no se pudo consultar al servidor. Antes eso
+        # se reportaba como "actualizado", asi que una caja que no alcanzaba el
+        # servidor se veia al dia: verde falso. Ahora se distingue.
         "ultima_version": ultima,
-        "actualizado": (ultima is None) or (ultima == POS_VERSION),
+        "version_consultada": ultima is not None,
+        "actualizado": (ultima == POS_VERSION),
     })
 
 

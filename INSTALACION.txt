@@ -26,6 +26,23 @@ INSTALACION EN 3 PASOS
 
    - Sin este archivo se usa la impresora predeterminada de Windows.
 
+3b. Servidor (solo si NO es el habitual)
+   - Por defecto este punto de impresion habla con:
+
+     https://ticketera.colorpark.cl
+
+   - Si tu instalacion usa otra direccion, crear un archivo de texto
+     llamado: servidor.txt (en esta carpeta) y escribir dentro SOLO
+     la direccion, sin barra al final. Ejemplo:
+
+     https://ticketera.colorpark.cl
+
+   - Es el servidor del que se bajan las plantillas y con el que se
+     compara la version. Si esta mal, la caja igual imprime lo que se
+     le mande, pero no sincroniza plantillas ni avisa de las
+     actualizaciones. La ticketera muestra un aviso cuando detecta
+     que esta caja no logra alcanzar el servidor.
+
 4. Indicar la tienda y la caja de este equipo
    a) TIENDA (obligatorio si hay varias sucursales):
       - Crear un archivo de texto: sucursal.txt (en esta carpeta)
