@@ -61,9 +61,14 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo        Configurando pywin32 (copia las DLLs que necesita win32ui)...
+for /f "delims=" %%P in ('%PYTHON% -c "import os,sys;print(os.path.dirname(sys.executable))"') do set "PYDIR=%%P"
+if exist "%PYDIR%\Scripts\pywin32_postinstall.py" %PYTHON% "%PYDIR%\Scripts\pywin32_postinstall.py" -install
+
 %PYTHON% -c "import flask, flask_cors, qrcode, win32print, win32ui, PIL" >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Las dependencias no quedaron operativas. Contacta a soporte.
+    echo [ERROR] Las dependencias no quedaron operativas (win32ui).
+    echo         Instala "Microsoft Visual C++ 2015-2022 Redistributable (x64)" y reintenta.
     pause
     exit /b 1
 )
@@ -87,12 +92,14 @@ exit /b 0
 
 :: ---------- Funciones ----------
 :buscar_python
+REM Preferir el py launcher: evita el stub de la Microsoft Store, que
+REM deja "import win32ui" roto (ImportError: DLL load failed).
 set "PYTHON="
-python --version >nul 2>&1
+py -3 --version >nul 2>&1
 if not errorlevel 1 (
-    set "PYTHON=python"
+    set "PYTHON=py -3"
     goto :eof
 )
-py -3 --version >nul 2>&1
-if not errorlevel 1 set "PYTHON=py -3"
+python --version >nul 2>&1
+if not errorlevel 1 set "PYTHON=python"
 goto :eof

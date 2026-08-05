@@ -17,7 +17,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})  # Habilitar CORS para todas las 
 
 # Version de este punto de impresion. Debe coincidir con la publicada
 # en el servidor (public/descargas/pos-version.json) al liberar un zip.
-POS_VERSION = "1.3.1"
+POS_VERSION = "1.3.2"
 
 # ------------------------------------------------------------------
 # Plantillas de ticket
