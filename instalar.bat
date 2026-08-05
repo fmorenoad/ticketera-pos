@@ -66,12 +66,20 @@ for /f "delims=" %%P in ('%PYTHON% -c "import os,sys;print(os.path.dirname(sys.e
 if exist "%PYDIR%\Scripts\pywin32_postinstall.py" %PYTHON% "%PYDIR%\Scripts\pywin32_postinstall.py" -install
 
 %PYTHON% -c "import flask, flask_cors, qrcode, win32print, win32ui, PIL" >nul 2>&1
+if not errorlevel 1 goto :listo
+
+echo        win32ui aun no carga: falta el runtime de Visual C++. Instalandolo...
+call :instalar_vcredist
+
+echo        Reintentando win32ui...
+%PYTHON% -c "import win32print, win32ui" >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Las dependencias no quedaron operativas (win32ui).
-    echo         Instala "Microsoft Visual C++ 2015-2022 Redistributable (x64)" y reintenta.
+    echo [ERROR] win32ui sigue sin cargar tras instalar el runtime de Visual C++.
+    echo         Reinicia el equipo y ejecuta instalar.bat otra vez.
     pause
     exit /b 1
 )
+echo        win32ui OK tras instalar el runtime.
 
 :: ---------- 3) Listo ----------
 :listo
@@ -102,4 +110,19 @@ if not errorlevel 1 (
 )
 python --version >nul 2>&1
 if not errorlevel 1 set "PYTHON=python"
+goto :eof
+
+:instalar_vcredist
+REM Descarga e instala el Microsoft Visual C++ 2015-2022 Redistributable (x64),
+REM que aporta las DLLs (vcruntime140 / mfc140u) de las que depende win32ui.
+set "VCEXE=%TEMP%\vc_redist.x64.exe"
+echo        Descargando Visual C++ Redistributable (x64)...
+powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile '%VCEXE%' -UseBasicParsing" 2>nul
+if not exist "%VCEXE%" (
+    echo [ERROR] No se pudo descargar el runtime de Visual C++. Revisa la conexion a internet.
+    goto :eof
+)
+echo        Instalando (silencioso; puede pedir permisos de administrador)...
+"%VCEXE%" /install /quiet /norestart
+del /q "%VCEXE%" >nul 2>&1
 goto :eof

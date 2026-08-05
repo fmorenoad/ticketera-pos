@@ -39,14 +39,37 @@ if exist "%PYDIR%\Scripts\pywin32_postinstall.py" %PYCMD% "%PYDIR%\Scripts\pywin
 
 echo Verificando win32ui...
 %PYCMD% -c "import win32print, win32ui, flask, flask_cors, qrcode, PIL" >nul 2>&1
+if not errorlevel 1 goto :ok
+
+echo win32ui no carga: falta el runtime de Visual C++. Instalandolo...
+call :instalar_vcredist
+echo Reintentando win32ui...
+%PYCMD% -c "import win32print, win32ui" >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Las dependencias no quedaron operativas (win32ui).
-    echo Si persiste, instala "Microsoft Visual C++ 2015-2022 Redistributable (x64)".
+    echo [ERROR] win32ui sigue sin cargar tras instalar el runtime de Visual C++.
+    echo Reinicia el equipo y ejecuta este instalador otra vez.
     pause
     exit /b 1
 )
 
+:ok
 echo.
 echo [OK] Instalacion completada. El entorno esta listo.
 echo Ejecuta iniciar_impresion.bat para levantar el servicio de impresion.
 pause
+goto :eof
+
+:instalar_vcredist
+REM Descarga e instala el Microsoft Visual C++ 2015-2022 Redistributable (x64),
+REM que aporta las DLLs (vcruntime140 / mfc140u) de las que depende win32ui.
+set "VCEXE=%TEMP%\vc_redist.x64.exe"
+echo Descargando Visual C++ Redistributable (x64)...
+powershell -NoProfile -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile '%VCEXE%' -UseBasicParsing" 2>nul
+if not exist "%VCEXE%" (
+    echo [ERROR] No se pudo descargar el runtime de Visual C++. Revisa la conexion a internet.
+    goto :eof
+)
+echo Instalando (silencioso; puede pedir permisos de administrador)...
+"%VCEXE%" /install /quiet /norestart
+del /q "%VCEXE%" >nul 2>&1
+goto :eof
