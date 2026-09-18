@@ -17,7 +17,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})  # Habilitar CORS para todas las 
 
 # Version de este punto de impresion. Debe coincidir con la publicada
 # en el servidor (public/descargas/pos-version.json) al liberar un zip.
-POS_VERSION = "1.3.3"
+POS_VERSION = "1.4.0"
 
 # ------------------------------------------------------------------
 # Plantillas de ticket
@@ -258,6 +258,35 @@ def sincronizar_plantillas():
     return {"sincronizada": True, "total": len(lista), "nuevas": nuevas, "actualizadas": actualizadas, "mensaje": mensaje}
 
 
+def sincronizar_plantilla_por_id(template_id):
+    """ Baja UNA plantilla por su id, aunque sea de otra sucursal.
+
+        El vendedor puede pertenecer a una tienda distinta de la del punto
+        de impresion (sucursal.txt): en ese caso este POS nunca bajo esa
+        plantilla, y antes la venta terminaba anulada. """
+    url = f"{obtener_servidor()}/api/plantillas?template_id={template_id}"
+
+    try:
+        with abrir_url(url, 8) as respuesta:
+            data = json.loads(respuesta.read().decode("utf-8"))
+    except Exception as e:
+        print(f"[SYNC] No se pudo pedir la plantilla {template_id}: {e}")
+        return False
+
+    for t in data.get("templates") or []:
+        if str(t.get("template_id") or "") != str(template_id):
+            continue
+
+        almacen = cargar_templates()
+        guardar_plantilla_sincronizada(almacen, str(template_id), t.get("nombre"), t.get("config"))
+        guardar_templates(almacen)
+        print(f"[SYNC] Plantilla {template_id} ({t.get('nombre')}) descargada.")
+        return True
+
+    print(f"[SYNC] El servidor no conoce la plantilla {template_id}.")
+    return False
+
+
 def sincronizar_plantilla_activa():
     """ Consulta al servidor cual es la plantilla activa y actualiza (o
         descarga) la copia local para que coincida con la web. """
@@ -332,6 +361,21 @@ def normalizar_plantilla(payload):
     return plantilla
 
 
+def formatear_monto(valor):
+    """$112000 -> $112.000. En un comprobante de caja se lee a ojo."""
+    if valor is None:
+        return "$0"
+
+    try:
+        entero = int(round(float(valor)))
+    except (TypeError, ValueError):
+        return f"${valor}"
+
+    signo = "-" if entero < 0 else ""
+
+    return f"{signo}${abs(entero):,}".replace(",", ".")
+
+
 def centrar_texto(pdc, texto):
     """ Calcula la posicion X para centrar un texto en la impresora """
     printer_width = pdc.GetDeviceCaps(8)
@@ -394,7 +438,6 @@ def imprimir_ticket(ticket, plantilla=None):
 
     # Configurar impresora
     printer_name = obtener_impresora()
-    hprinter = win32print.OpenPrinter(printer_name)
     pdc = win32ui.CreateDC()
     pdc.CreatePrinterDC(printer_name)
     pdc.StartDoc('Ticket')
@@ -489,7 +532,6 @@ def imprimir_resumen(cantidad_tickets):
 
     # Configurar impresora
     printer_name = obtener_impresora()
-    hprinter = win32print.OpenPrinter(printer_name)
     pdc = win32ui.CreateDC()
     pdc.CreatePrinterDC(printer_name)
     pdc.StartDoc('Resumen')
@@ -529,7 +571,6 @@ def imprimir_ticket_cierre_turno(titulo, datos):
 
     # Configurar impresora
     printer_name = obtener_impresora()
-    hprinter = win32print.OpenPrinter(printer_name)
     pdc = win32ui.CreateDC()
     pdc.CreatePrinterDC(printer_name)
     pdc.StartDoc(titulo)
@@ -564,29 +605,64 @@ def imprimir_ticket_cierre_turno(titulo, datos):
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 30)
 
+    # Con varias cajas y varias tiendas, un comprobante sin caja no sirve
+    # para cuadrar nada. Los .get() permiten que una web mas antigua siga
+    # imprimiendo sin romperse.
+    if datos.get('punto_venta') and str(datos['punto_venta']) != '0':
+        pdc.TextOut(x, y, f"Caja: {datos['punto_venta']}")
+        y = mover_y(y, 30)
+
+    if datos.get('sucursal'):
+        pdc.TextOut(x, y, f"Tienda: {datos['sucursal']}")
+        y = mover_y(y, 30)
+
+    # Cierre hecho por un administrador sobre el turno de otra persona.
+    if datos.get('cerrado_por'):
+        pdc.TextOut(x, y, f"Cerrado por: {datos['cerrado_por']}")
+        y = mover_y(y, 30)
+
     pdc.SelectObject(amount_font)
     texto = " -----------------------------------------------"
     pdc.TextOut(centrar_texto(pdc, texto), y, texto)
     y = mover_y(y, 70)
 
-    texto = f"Inicial en caja: ${datos['inicial_caja']}"
+    texto = f"Inicial en caja: {formatear_monto(datos['inicial_caja'])}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 50)
 
     pdc.SelectObject(amount_font)
-    texto = f"Total vendido: ${datos['total_recaudado']}"
+    texto = f"Total vendido: {formatear_monto(datos['total_recaudado'])}"
+    pdc.TextOut(x, y, texto)
+    y = mover_y(y, 50)
+
+    # Desglose por medio de pago: es lo que explica por que la entrega
+    # final no es igual al total vendido.
+    por_medio = datos.get('por_medio') or {}
+    if por_medio:
+        pdc.SelectObject(normal_font)
+        if datos.get('cantidad'):
+            pdc.TextOut(x, y, f"  Tickets vendidos: {datos['cantidad']}")
+            y = mover_y(y, 30)
+        for medio, monto in sorted(por_medio.items()):
+            pdc.TextOut(x, y, f"  {medio}: {formatear_monto(monto)}")
+            y = mover_y(y, 30)
+        y = mover_y(y, 20)
+
+    pdc.SelectObject(amount_font)
+    texto = f"Total retiros: {formatear_monto(datos['entregas'])}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 50)
 
     pdc.SelectObject(amount_font)
-    texto = f"Total retiros: ${datos['entregas']}"
+    texto = f"Entrega final: {formatear_monto(datos['entrega_final'])}"
     pdc.TextOut(x, y, texto)
     y = mover_y(y, 50)
 
-    pdc.SelectObject(amount_font)
-    texto = f"Entrega final: ${datos['entrega_final']}"
-    pdc.TextOut(x, y, texto)
-    y = mover_y(y, 70)
+    # La entrega final es solo efectivo: dejarlo escrito evita el reclamo
+    # de "falta plata" cuando la diferencia son ventas con tarjeta.
+    pdc.SelectObject(normal_font)
+    pdc.TextOut(x, y, "  (efectivo en el cajon, sin ventas con tarjeta)")
+    y = mover_y(y, 50)
 
     texto = " -----------------------------------------------"
     pdc.TextOut(centrar_texto(pdc, texto), y, texto)
@@ -623,7 +699,6 @@ def imprimir_ticket_retiro(titulo, datos):
 
     # Configurar impresora
     printer_name = obtener_impresora()
-    hprinter = win32print.OpenPrinter(printer_name)
     pdc = win32ui.CreateDC()
     pdc.CreatePrinterDC(printer_name)
     pdc.StartDoc(titulo)
@@ -770,12 +845,31 @@ def receive_tickets():
                 return jsonify({"status": "error", "message": "Falta el template_id"}), 400
 
             registradas = cargar_templates()["templates"]
-            if template_id not in registradas:
-                return jsonify({"status": "error", "message": f"La plantilla {template_id} no esta registrada en este POS. Enviala desde la web antes de imprimir."}), 404
 
-            plantilla = registradas[template_id]
+            # La plantilla puede no estar aqui cuando el vendedor pertenece a
+            # una sucursal distinta de la del POS (sucursal.txt): la web manda
+            # la plantilla de SU sucursal y este POS solo bajo las de la suya.
+            if template_id not in registradas:
+                print(f"[TPL] Plantilla {template_id} desconocida; pidiendola al servidor...")
+                if not sincronizar_plantilla_por_id(template_id):
+                    sincronizar_plantillas()
+                registradas = cargar_templates()["templates"]
+
+            if template_id not in registradas:
+                # El cliente ya pago: se imprime con el formato por defecto.
+                # Devolver error aqui hacia que la web anulara la venta, que es
+                # mucho peor que imprimir con otro formato.
+                advertencia = (f"La plantilla {template_id} no esta en este POS: "
+                               "se imprimio con el formato por defecto. "
+                               "Revisa la sucursal del vendedor y la del punto de impresion.")
+                print(f"[TPL] {advertencia}")
+                plantilla = None
+            else:
+                advertencia = None
+                plantilla = registradas[template_id]
         else:
             tickets = data  # Formato antiguo: lista de tickets sin plantilla
+            advertencia = None
 
         if not tickets or not isinstance(tickets, list):
             return jsonify({"status": "error", "message": "Formato incorrecto, se espera una lista de tickets"}), 400
@@ -789,7 +883,11 @@ def receive_tickets():
         # Imprimir resumen al final
         #imprimir_resumen(len(tickets))
 
-        return jsonify({"status": "success", "message": f"Se imprimieron {len(tickets)} tickets"})
+        respuesta = {"status": "success", "message": f"Se imprimieron {len(tickets)} tickets"}
+        if advertencia:
+            respuesta["advertencia"] = advertencia
+
+        return jsonify(respuesta)
 
     except Exception as e:
         print(f"[ERROR] En la API: {e}")
